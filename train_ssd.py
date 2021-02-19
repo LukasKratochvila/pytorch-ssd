@@ -11,6 +11,8 @@ from torch.optim.lr_scheduler import CosineAnnealingLR, MultiStepLR
 from vision.utils.misc import str2bool, Timer, freeze_net_layers, store_labels
 from vision.ssd.ssd import MatchPrior
 from vision.ssd.vgg_ssd import create_vgg_ssd
+from vision.ssd.vgg_ssd1 import create_vgg_ssd1
+from vision.ssd.vgg_ssd2 import create_vgg_ssd2
 from vision.ssd.mobilenetv1_ssd import create_mobilenetv1_ssd
 from vision.ssd.mobilenetv1_ssd_lite import create_mobilenetv1_ssd_lite
 from vision.ssd.mobilenet_v2_ssd_lite import create_mobilenetv2_ssd_lite
@@ -18,8 +20,10 @@ from vision.ssd.mobilenetv3_ssd_lite import create_mobilenetv3_large_ssd_lite, c
 from vision.ssd.squeezenet_ssd_lite import create_squeezenet_ssd_lite
 from vision.datasets.voc_dataset import VOCDataset
 from vision.datasets.open_images import OpenImagesDataset
+from vision.datasets.yolo_dataset import YOLODataset
+from vision.datasets.index_dataset import IndexDataset
 from vision.nn.multibox_loss import MultiboxLoss
-from vision.ssd.config import vgg_ssd_config
+from vision.ssd.config import vgg_ssd_config, vgg_ssd_config1, vgg_ssd_config2
 from vision.ssd.config import mobilenetv1_ssd_config
 from vision.ssd.config import squeezenet_ssd_config
 from vision.ssd.data_preprocessing import TrainAugmentation, TestTransform
@@ -27,7 +31,7 @@ from vision.ssd.data_preprocessing import TrainAugmentation, TestTransform
 parser = argparse.ArgumentParser(
     description='Single Shot MultiBox Detector Training With Pytorch')
 
-parser.add_argument("--dataset_type", default="voc", type=str,
+parser.add_argument("--dataset_type", default="yolo", type=str,
                     help='Specify dataset type. Currently support voc and open_images.')
 
 parser.add_argument('--datasets', nargs='+', help='Dataset directory path')
@@ -81,7 +85,7 @@ parser.add_argument('--t_max', default=120, type=float,
                     help='T_max value for Cosine Annealing Scheduler.')
 
 # Train params
-parser.add_argument('--batch_size', default=32, type=int,
+parser.add_argument('--batch_size', default=5, type=int,
                     help='Batch size for training')
 parser.add_argument('--num_epochs', default=120, type=int,
                     help='the number epochs')
@@ -96,11 +100,21 @@ parser.add_argument('--use_cuda', default=True, type=str2bool,
 
 parser.add_argument('--checkpoint_folder', default='models/',
                     help='Directory for saving checkpoint models')
+parser.add_argument('--log', default=sys.stdout,
+                    help='File to logging')
+parser.add_argument('--visdom', action='store_false',
+                    help='Use visdom for loss visualization')
 
 
-logging.basicConfig(stream=sys.stdout, level=logging.INFO,
-                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
 args = parser.parse_args()
+
+if args.log == sys.stdout:
+    logging.basicConfig(stream=args.log, level=logging.INFO,
+                        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+else:
+    logging.basicConfig(filename=args.log, level=logging.INFO,
+                        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 DEVICE = torch.device("cuda:0" if torch.cuda.is_available() and args.use_cuda else "cpu")
 
 if args.use_cuda and torch.cuda.is_available():
@@ -110,6 +124,8 @@ if args.use_cuda and torch.cuda.is_available():
 
 def train(loader, net, criterion, optimizer, device, debug_steps=100, epoch=-1):
     net.train(True)
+    loc_loss = 0.0
+    conf_loss = 0.0
     running_loss = 0.0
     running_regression_loss = 0.0
     running_classification_loss = 0.0
@@ -129,6 +145,11 @@ def train(loader, net, criterion, optimizer, device, debug_steps=100, epoch=-1):
         running_loss += loss.item()
         running_regression_loss += regression_loss.item()
         running_classification_loss += classification_loss.item()
+        loc_loss += regression_loss.item()
+        conf_loss += classification_loss.item()
+        if args.visdom:
+            update_vis_plot(epoch*len(loader) + i, regression_loss.item(), classification_loss.item(),
+                            iter_plot, epoch_plot, 'append')
         if i and i % debug_steps == 0:
             avg_loss = running_loss / debug_steps
             avg_reg_loss = running_regression_loss / debug_steps
@@ -142,6 +163,10 @@ def train(loader, net, criterion, optimizer, device, debug_steps=100, epoch=-1):
             running_loss = 0.0
             running_regression_loss = 0.0
             running_classification_loss = 0.0
+    
+    if args.visdom:
+        update_vis_plot(epoch, loc_loss, conf_loss, epoch_plot, None,
+                        'append', args.num_epochs)
 
 
 def test(loader, net, criterion, device):
@@ -167,14 +192,54 @@ def test(loader, net, criterion, device):
         running_classification_loss += classification_loss.item()
     return running_loss / num, running_regression_loss / num, running_classification_loss / num
 
+def create_vis_plot(_xlabel, _ylabel, _title, _legend):
+    return viz.line(
+        X=torch.zeros((1,)).cpu(),
+        Y=torch.zeros((1, 3)).cpu(),
+        opts=dict(
+            xlabel=_xlabel,
+            ylabel=_ylabel,
+            title=_title,
+            legend=_legend
+        )
+    )
+
+
+def update_vis_plot(iteration, loc, conf, window1, window2, update_type,
+                    epoch_size=1):
+    viz.line(
+        X=torch.ones((1, 3)).cpu() * iteration,
+        Y=torch.Tensor([loc, conf, loc + conf]).unsqueeze(0).cpu() / epoch_size,
+        win=window1,
+        update=update_type
+    )
+    # initialize epoch plot on first iteration
+    # if iteration == 0:
+    #     viz.line(
+    #         X=torch.zeros((1, 3)).cpu(),
+    #         Y=torch.Tensor([loc, conf, loc + conf]).unsqueeze(0).cpu(),
+    #         win=window2,
+    #         update=True
+    #     )
 
 if __name__ == '__main__':
+    
+    if args.visdom:
+        import visdom
+        viz = visdom.Visdom()
+        
     timer = Timer()
 
     logging.info(args)
     if args.net == 'vgg16-ssd':
         create_net = create_vgg_ssd
         config = vgg_ssd_config
+    elif args.net == 'vgg16-ssd1':
+        create_net = create_vgg_ssd1
+        config = vgg_ssd_config1
+    elif args.net == 'vgg16-ssd2':
+        create_net = create_vgg_ssd2
+        config = vgg_ssd_config2
     elif args.net == 'mb1-ssd':
         create_net = create_mobilenetv1_ssd
         config = mobilenetv1_ssd_config
@@ -220,7 +285,31 @@ if __name__ == '__main__':
             store_labels(label_file, dataset.class_names)
             logging.info(dataset)
             num_classes = len(dataset.class_names)
-
+        elif args.dataset_type == 'yolo':
+            dataset = YOLODataset(dataset_path,
+                 transform=train_transform, target_transform=target_transform,
+                 dataset_type="train", balance_data=args.balance_data)
+            label_file = os.path.join(args.checkpoint_folder, "yolo-model-labels.txt")
+            store_labels(label_file, dataset.class_names)
+            logging.info(dataset)
+            num_classes = len(dataset.class_names)
+        elif args.dataset_type == 'yolo-simple':
+            dataset = YOLODataset(dataset_path,
+                 transform=train_transform, target_transform=target_transform,
+                 dataset_type="train_simple", balance_data=args.balance_data)
+            label_file = os.path.join(args.checkpoint_folder, "yolo-model-labels.txt")
+            store_labels(label_file, dataset.class_names)
+            logging.info(dataset)
+            num_classes = len(dataset.class_names)
+        elif args.dataset_type == 'index':
+            dataset = IndexDataset(dataset_path,
+                 transform=train_transform, target_transform=target_transform,
+                 dataset_type="train", balance_data=args.balance_data)
+            label_file = os.path.join(args.checkpoint_folder, "index-model-labels.txt")
+            store_labels(label_file, dataset.class_names)
+            logging.info(dataset)
+            num_classes = len(dataset.class_names)
+            
         else:
             raise ValueError(f"Dataset type {args.dataset_type} is not supported.")
         datasets.append(dataset)
@@ -238,6 +327,16 @@ if __name__ == '__main__':
         val_dataset = OpenImagesDataset(dataset_path,
                                         transform=test_transform, target_transform=target_transform,
                                         dataset_type="test")
+        logging.info(val_dataset)
+    elif args.dataset_type == 'yolo' or args.dataset_type == 'yolo-simple':
+        val_dataset = YOLODataset(dataset_path,
+                                    transform=test_transform, target_transform=target_transform,
+                                    dataset_type="val")
+        logging.info(val_dataset)
+    elif args.dataset_type == 'index':
+        val_dataset = IndexDataset(dataset_path,
+                                    transform=test_transform, target_transform=target_transform,
+                                    dataset_type="val")
         logging.info(val_dataset)
     logging.info("validation dataset size: {}".format(len(val_dataset)))
 
@@ -299,7 +398,7 @@ if __name__ == '__main__':
 
     net.to(DEVICE)
 
-    criterion = MultiboxLoss(config.priors, iou_threshold=0.5, neg_pos_ratio=3,
+    criterion = MultiboxLoss(config.priors, iou_threshold=0.5, neg_pos_ratio=5,#S3,
                              center_variance=0.1, size_variance=0.2, device=DEVICE)
     optimizer = torch.optim.SGD(params, lr=args.lr, momentum=args.momentum,
                                 weight_decay=args.weight_decay)
@@ -319,7 +418,15 @@ if __name__ == '__main__':
         parser.print_help(sys.stderr)
         sys.exit(1)
 
+    if args.visdom:
+        vis_title = 'PyTorch-ssd on ' + args.dataset_type
+        vis_legend = ['Loc Loss', 'Conf Loss', 'Total Loss']
+        iter_plot = create_vis_plot('Iteration', 'Loss', vis_title, vis_legend)
+        epoch_plot = create_vis_plot('Epoch', 'Loss', vis_title, vis_legend)
+        val_plot = create_vis_plot('val', 'Loss', vis_title, vis_legend)
+        
     logging.info(f"Start training from epoch {last_epoch + 1}.")
+        
     for epoch in range(last_epoch + 1, args.num_epochs):
         scheduler.step()
         train(train_loader, net, criterion, optimizer,
@@ -333,6 +440,9 @@ if __name__ == '__main__':
                 f"Validation Regression Loss {val_regression_loss:.4f}, " +
                 f"Validation Classification Loss: {val_classification_loss:.4f}"
             )
+            if args.visdom:
+                update_vis_plot(epoch, val_regression_loss, val_classification_loss, val_plot, None,
+                                'append', args.num_epochs)
             model_path = os.path.join(args.checkpoint_folder, f"{args.net}-Epoch-{epoch}-Loss-{val_loss}.pth")
             net.save(model_path)
             logging.info(f"Saved model {model_path}")
