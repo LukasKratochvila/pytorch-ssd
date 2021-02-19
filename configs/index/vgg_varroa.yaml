@@ -1,0 +1,8 @@
+# vgg_varroa.yaml file
+
+net: vgg16-ssd 
+trained_model: models/index-dataset/vgg_varroa/vgg16-ssd-Epoch-50-Loss-3,951725721359253.pth #vgg16-ssd-Epoch-180-Loss-3,757772445678711.pth #vgg16-ssd-Epoch-30-Loss-4,162630081176758.pth #vgg16-ssd-Epoch-85-Loss-3,755652904510498.pth
+dataset_type: index 
+dataset: /media/pc-neuron/Data/Lukas/PHD_Industry_Anomaly/Bee_project/new_no_index/labels_v
+label_file: models/index-dataset/vgg_varroa/index-model-labels.txt 
+eval_dir: eval_results/index-dataset/vgg_varroa

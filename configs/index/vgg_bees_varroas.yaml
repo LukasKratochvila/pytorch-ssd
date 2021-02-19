@@ -1,0 +1,8 @@
+# vgg_bees_varroas.yaml file
+
+net: vgg16-ssd 
+trained_model: models/index-dataset/vgg_bees_varroas/vgg16-ssd-Epoch-20-Loss-2,132284641265869.pth
+dataset_type: index 
+dataset: /media/pc-neuron/Data/Lukas/PHD_Industry_Anomaly/Bee_project/new_no_index/labels_b_v
+label_file: models/index-dataset/vgg_bees_varroas/index-model-labels.txt 
+eval_dir: eval_results/index-dataset/vgg_bees_varroas

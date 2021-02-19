@@ -1,0 +1,8 @@
+# mb1_bees_health_ill.yaml file
+
+net: mb1-ssd 
+trained_model: models/mb1_bees_health_ill/final.pth
+dataset_type: yolo 
+dataset: /media/pc-neuron/Data/Lukas/PHD_Industry_Anomaly/Bee_project/dataset-yolo/labels_bees_health_ill 
+label_file: models/mb1_bees_health_ill/yolo-model-labels.txt 
+eval_dir: eval_results/mb1_bees_health_ill

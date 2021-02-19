@@ -1,10 +1,14 @@
 import torch
 from vision.ssd.vgg_ssd import create_vgg_ssd, create_vgg_ssd_predictor
+from vision.ssd.vgg_ssd1 import create_vgg_ssd1, create_vgg_ssd_predictor1
+from vision.ssd.vgg_ssd2 import create_vgg_ssd2, create_vgg_ssd_predictor2
 from vision.ssd.mobilenetv1_ssd import create_mobilenetv1_ssd, create_mobilenetv1_ssd_predictor
 from vision.ssd.mobilenetv1_ssd_lite import create_mobilenetv1_ssd_lite, create_mobilenetv1_ssd_lite_predictor
 from vision.ssd.squeezenet_ssd_lite import create_squeezenet_ssd_lite, create_squeezenet_ssd_lite_predictor
 from vision.datasets.voc_dataset import VOCDataset
 from vision.datasets.open_images import OpenImagesDataset
+from vision.datasets.yolo_dataset import YOLODataset
+from vision.datasets.index_dataset import IndexDataset
 from vision.utils import box_utils, measurements
 from vision.utils.misc import str2bool, Timer
 import argparse
@@ -14,6 +18,8 @@ import logging
 import sys
 from vision.ssd.mobilenet_v2_ssd_lite import create_mobilenetv2_ssd_lite, create_mobilenetv2_ssd_lite_predictor
 from vision.ssd.mobilenetv3_ssd_lite import create_mobilenetv3_large_ssd_lite, create_mobilenetv3_small_ssd_lite
+
+import yaml
 
 
 parser = argparse.ArgumentParser(description="SSD Evaluation on VOC Dataset.")
@@ -32,6 +38,7 @@ parser.add_argument("--iou_threshold", type=float, default=0.5, help="The thresh
 parser.add_argument("--eval_dir", default="eval_results", type=str, help="The directory to store evaluation results.")
 parser.add_argument('--mb2_width_mult', default=1.0, type=float,
                     help='Width Multiplifier for MobilenetV2')
+parser.add_argument("--config", type=str, help='Path config file (yaml)')
 args = parser.parse_args()
 DEVICE = torch.device("cuda:0" if torch.cuda.is_available() and args.use_cuda else "cpu")
 
@@ -109,20 +116,36 @@ def compute_average_precision_per_class(num_true_cases, gt_boxes, difficult_case
                         false_positive[i] = 1
             else:
                 false_positive[i] = 1
-
+    
+    tp=true_positive.sum()
+    fp=false_positive.sum()
+    p=tp/(tp+fp)
+    r=tp/num_true_cases
     true_positive = true_positive.cumsum()
     false_positive = false_positive.cumsum()
     precision = true_positive / (true_positive + false_positive)
     recall = true_positive / num_true_cases
     if use_2007_metric:
-        return measurements.compute_voc2007_average_precision(precision, recall)
+        return measurements.compute_voc2007_average_precision(precision, recall), p, r
     else:
-        return measurements.compute_average_precision(precision, recall)
+        return measurements.compute_average_precision(precision, recall), p, r
 
 
 if __name__ == '__main__':
+    if args.config:
+        with open(args.config) as f:
+            config = yaml.load(f, Loader=yaml.FullLoader)
+        args.net = config['net']
+        args.trained_model = config['trained_model']
+        args.dataset_type = config['dataset_type']
+        args.dataset = config['dataset']
+        args.label_file = config['label_file']
+        args.eval_dir = config['eval_dir']
+        
     eval_path = pathlib.Path(args.eval_dir)
-    eval_path.mkdir(exist_ok=True)
+    eval_path.mkdir(exist_ok=True)    
+    yolo_f_path = pathlib.Path(args.eval_dir + '/labels')
+    yolo_f_path.mkdir(exist_ok=True) 
     timer = Timer()
     class_names = [name.strip() for name in open(args.label_file).readlines()]
 
@@ -130,10 +153,18 @@ if __name__ == '__main__':
         dataset = VOCDataset(args.dataset, is_test=True)
     elif args.dataset_type == 'open_images':
         dataset = OpenImagesDataset(args.dataset, dataset_type="test")
+    elif args.dataset_type == 'yolo':
+        dataset = YOLODataset(args.dataset, dataset_type="test")
+    elif args.dataset_type == 'index':
+        dataset = IndexDataset(args.dataset, dataset_type="test")
 
     true_case_stat, all_gb_boxes, all_difficult_cases = group_annotation_by_class(dataset)
     if args.net == 'vgg16-ssd':
         net = create_vgg_ssd(len(class_names), is_test=True)
+    elif args.net == 'vgg16-ssd1':
+        net = create_vgg_ssd1(len(class_names), is_test=True)
+    elif args.net == 'vgg16-ssd2':
+        net = create_vgg_ssd2(len(class_names), is_test=True)
     elif args.net == 'mb1-ssd':
         net = create_mobilenetv1_ssd(len(class_names), is_test=True)
     elif args.net == 'mb1-ssd-lite':
@@ -156,15 +187,19 @@ if __name__ == '__main__':
     net = net.to(DEVICE)
     print(f'It took {timer.end("Load Model")} seconds to load the model.')
     if args.net == 'vgg16-ssd':
-        predictor = create_vgg_ssd_predictor(net, nms_method=args.nms_method, device=DEVICE)
+        predictor = create_vgg_ssd_predictor(net, nms_method=args.nms_method, iou_threshold=0.5, device=DEVICE)
+    elif args.net == 'vgg16-ssd1':
+        predictor = create_vgg_ssd_predictor1(net, nms_method=args.nms_method, iou_threshold=0.5, device=DEVICE)
+    elif args.net == 'vgg16-ssd2':
+        predictor = create_vgg_ssd_predictor2(net, nms_method=args.nms_method, iou_threshold=0.2, device=DEVICE)
     elif args.net == 'mb1-ssd':
-        predictor = create_mobilenetv1_ssd_predictor(net, nms_method=args.nms_method, device=DEVICE)
+        predictor = create_mobilenetv1_ssd_predictor(net, nms_method=args.nms_method, iou_threshold=0.5, device=DEVICE)
     elif args.net == 'mb1-ssd-lite':
         predictor = create_mobilenetv1_ssd_lite_predictor(net, nms_method=args.nms_method, device=DEVICE)
     elif args.net == 'sq-ssd-lite':
         predictor = create_squeezenet_ssd_lite_predictor(net,nms_method=args.nms_method, device=DEVICE)
     elif args.net == 'mb2-ssd-lite' or args.net == "mb3-large-ssd-lite" or args.net == "mb3-small-ssd-lite":
-        predictor = create_mobilenetv2_ssd_lite_predictor(net, nms_method=args.nms_method, device=DEVICE)
+        predictor = create_mobilenetv2_ssd_lite_predictor(net, nms_method=args.nms_method, iou_threshold=0.5, device=DEVICE)
     else:
         logging.fatal("The net type is wrong. It should be one of vgg16-ssd, mb1-ssd and mb1-ssd-lite.")
         parser.print_help(sys.stderr)
@@ -177,15 +212,30 @@ if __name__ == '__main__':
         image = dataset.get_image(i)
         print("Load Image: {:4f} seconds.".format(timer.end("Load Image")))
         timer.start("Predict")
-        boxes, labels, probs = predictor.predict(image)
+        boxes, labels, probs = predictor.predict(image,prob_threshold=0.3)
         print("Prediction: {:4f} seconds.".format(timer.end("Predict")))
         indexes = torch.ones(labels.size(0), 1, dtype=torch.float32) * i
-        results.append(torch.cat([
-            indexes.reshape(-1, 1),
-            labels.reshape(-1, 1).float(),
-            probs.reshape(-1, 1),
-            boxes + 1.0  # matlab's indexes start from 1
-        ], dim=1))
+        
+        boxes_n=boxes.numpy()
+        labels_n=labels.numpy()
+        
+        image_id = dataset.ids[i]
+        prediction_path = yolo_f_path / f"{image_id}.txt"
+        
+        with open(prediction_path, "w") as f:
+            for j in range(boxes_n.shape[0]):
+                print(str(int(labels_n[j])) + " " + " ".join([str(v) for v in boxes_n[j]]),file=f)
+        
+        if len(labels)>0:
+            results.append(torch.cat([
+                indexes.reshape(-1, 1),
+                labels.reshape(-1, 1).float(),
+                probs.reshape(-1, 1),
+                boxes + 1.0  # matlab's indexes start from 1
+            ], dim=1))
+    if len(results)==0:
+        print("None object were found.")
+        sys.exit(0)
     results = torch.cat(results)
     for class_index, class_name in enumerate(class_names):
         if class_index == 0: continue  # ignore background
@@ -200,12 +250,16 @@ if __name__ == '__main__':
                     file=f
                 )
     aps = []
-    print("\n\nAverage Precision Per-class:")
+    ps = []
+    rs = []
+    fs = []
+    mAPs=[]
+    print("\n\nResults Per-class:")
     for class_index, class_name in enumerate(class_names):
         if class_index == 0:
             continue
         prediction_path = eval_path / f"det_test_{class_name}.txt"
-        ap = compute_average_precision_per_class(
+        ap,p,r = compute_average_precision_per_class(
             true_case_stat[class_index],
             all_gb_boxes[class_index],
             all_difficult_cases[class_index],
@@ -213,7 +267,47 @@ if __name__ == '__main__':
             args.iou_threshold,
             args.use_2007_metric
         )
+        f = 2*(p*r)/(p+r);
         aps.append(ap)
-        print(f"{class_name}: {ap}")
+        ps.append(p)
+        rs.append(r)
+        fs.append(f)
+        mAP=[]
+        for iou in [0.5,0.55,0.6,0.65,0.7,0.75,0.8,0.85,0.9]:
+            ap1,_,_ = compute_average_precision_per_class(
+            true_case_stat[class_index],
+            all_gb_boxes[class_index],
+            all_difficult_cases[class_index],
+            prediction_path,
+            iou,
+            args.use_2007_metric
+            )
+            mAP.append(ap1)
+        mAPs.append(sum(mAP)/len(mAP))
+        print(f"{class_name}: mAP[{args.iou_threshold}] {ap:0.4} mAP[0.5:0.95]: {sum(mAP)/len(mAP):0.4}")
+        print(f"\t\tf1: {f:0.9} precision: {p:0.4} recall: {r:0.4}")
+    
+    print("\nAverage for All Classes")
+    print(f"\nAverage mAP[{args.iou_threshold}]: {sum(aps)/len(aps):0.4}")
+    print(f"Average mAP[0.5:0.95]: {sum(mAPs)/len(mAPs):0.4}")
+    print(f"Average F1-score: {sum(fs)/len(fs):0.9}")
+    print(f"Average Precision: {sum(ps)/len(ps):0.4}")
+    print(f"Average Recall: {sum(rs)/len(rs):0.4}")
+    
+    result_path = eval_path / "results_test.txt"
+    with open(result_path, "w") as f:
+        for class_index, class_name in enumerate(class_names):
+            if class_index == 0:
+                continue
+            print("\n\nResults Per-class:",file=f)
+            print(f"{class_name}: mAP[{args.iou_threshold}] {aps[class_index-1]:0.4} mAP[0.5:0.95]: {mAPs[class_index-1]:0.4}",file=f)
+            print(f"\t\tf1: {fs[class_index-1]:0.9} precision: {ps[class_index-1]:0.4} recall: {rs[class_index-1]:0.4}",file=f)
+    
+        print("\nAverage for All Classes",file=f)
+        print(f"\nAverage mAP[{args.iou_threshold}]: {sum(aps)/len(aps):0.4}",file=f)
+        print(f"Average mAP[0.5:0.95]: {sum(mAPs)/len(mAPs):0.4}",file=f)
+        print(f"Average F1-score: {sum(fs)/len(fs):0.9}",file=f)
+        print(f"Average Precision: {sum(ps)/len(ps):0.4}",file=f)
+        print(f"Average Recall: {sum(rs)/len(rs):0.4}",file=f)
 
-    print(f"\nAverage Precision Across All Classes:{sum(aps)/len(aps)}")
+    val_det=['ApisM_088','ApisM_236','ApisM_400','ApisM_496']

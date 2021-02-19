@@ -1,0 +1,8 @@
+# mb2_bees_health_ill.yaml file
+
+net: mb2-ssd-lite 
+trained_model: models/index-dataset/mb2_bees_health_ill/mb2-ssd-lite-Epoch-70-Loss-2,7659349838892617.pth #mb2-ssd-lite-Epoch-100-Loss-2,6078454653422036.pth #mb2-ssd-lite-Epoch-135-Loss-2,5078890721003213.pth
+dataset_type: index 
+dataset: /media/pc-neuron/Data/Lukas/PHD_Industry_Anomaly/Bee_project/new_no_index/labels_h_i
+label_file: models/index-dataset/mb2_bees_health_ill/index-model-labels.txt 
+eval_dir: eval_results/index-dataset/mb2_bees_health_ill

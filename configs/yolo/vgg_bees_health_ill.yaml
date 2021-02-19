@@ -1,0 +1,8 @@
+# vgg_bees_health_ill.yaml file
+
+net: vgg16-ssd 
+trained_model: models/vgg_bees_health_ill/continue/vgg16-ssd-Epoch-60-Loss-1,5060472041368484.pth
+dataset_type: yolo 
+dataset: /media/pc-neuron/Data/Lukas/PHD_Industry_Anomaly/Bee_project/dataset-yolo/labels_bees_health_ill 
+label_file: models/vgg_bees_health_ill/yolo-model-labels.txt 
+eval_dir: eval_results/vgg_bees_health_ill

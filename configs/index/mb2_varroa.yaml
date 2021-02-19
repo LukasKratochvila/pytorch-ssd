@@ -1,0 +1,8 @@
+# mb2_varroa.yaml file
+
+net: mb2-ssd-lite 
+trained_model: models/index-dataset/mb2_varroa/mb2-ssd-lite-Epoch-100-Loss-4,830199241638184.pth
+dataset_type: index 
+dataset: /media/pc-neuron/Data/Lukas/PHD_Industry_Anomaly/Bee_project/new_no_index/labels_v
+label_file: models/index-dataset/mb2_varroa/index-model-labels.txt 
+eval_dir: eval_results/index-dataset/mb2_varroa

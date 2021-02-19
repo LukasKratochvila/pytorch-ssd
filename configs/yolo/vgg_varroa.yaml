@@ -1,0 +1,8 @@
+# vgg_varroa.yaml file
+
+net: vgg16-ssd 
+trained_model: models/vgg_varroa/vgg16-ssd-Epoch-195-Loss-3,455378452936808.pth
+dataset_type: yolo 
+dataset: /media/pc-neuron/Data/Lukas/PHD_Industry_Anomaly/Bee_project/dataset-yolo/labels_varroa
+label_file: models/vgg_varroa/yolo-model-labels.txt 
+eval_dir: eval_results/vgg_varroa

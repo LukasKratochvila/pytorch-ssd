@@ -1,0 +1,8 @@
+# mb1_varroa.yaml file
+
+net: mb1-ssd 
+trained_model: models/mb1_varroa/final.pth
+dataset_type: yolo 
+dataset: /media/pc-neuron/Data/Lukas/PHD_Industry_Anomaly/Bee_project/dataset-yolo/labels_varroa
+label_file: models/mb1_varroa/yolo-model-labels.txt 
+eval_dir: eval_results/mb1_varroa

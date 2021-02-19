@@ -1,0 +1,8 @@
+# vgg_bees_health_ill.yaml file
+
+net: vgg16-ssd 
+trained_model: models/index-dataset/vgg_bees_health_ill/vgg16-ssd-Epoch-25-Loss-1,7599334220091503.pth
+dataset_type: index 
+dataset: /media/pc-neuron/Data/Lukas/PHD_Industry_Anomaly/Bee_project/new_no_index/labels_h_i
+label_file: models/index-dataset/vgg_bees_health_ill/index-model-labels.txt 
+eval_dir: eval_results/index-dataset/vgg_bees_health_ill

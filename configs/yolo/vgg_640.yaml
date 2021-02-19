@@ -1,0 +1,8 @@
+# vgg_varroa.yaml file
+
+net: vgg16-ssd2 
+trained_model: models/vgg_640/vgg16-ssd2-Epoch-10-Loss-6,6050184180096885.pth
+dataset_type: yolo 
+dataset: /media/pc-neuron/Data/Lukas/PHD_Industry_Anomaly/Bee_project/dataset-yolo/labels_bees_health_ill
+label_file: models/vgg_640/yolo-model-labels.txt 
+eval_dir: eval_results/vgg_640
