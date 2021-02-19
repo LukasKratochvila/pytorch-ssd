@@ -44,7 +44,8 @@ class Predictor:
         boxes = boxes.to(cpu_device)
         scores = scores.to(cpu_device)
         picked_box_probs = []
-        picked_labels = []
+        # picked_labels = []
+        boxes_probs_classes = torch.Tensor()
         for class_index in range(1, scores.size(1)):
             probs = scores[:, class_index]
             mask = probs > prob_threshold
@@ -52,15 +53,18 @@ class Predictor:
             if probs.size(0) == 0:
                 continue
             subset_boxes = boxes[mask, :]
-            box_probs = torch.cat([subset_boxes, probs.reshape(-1, 1)], dim=1)
-            box_probs = box_utils.nms(box_probs, self.nms_method,
+            label = torch.Tensor([class_index]*probs.size(0))
+            box_probs = torch.cat([subset_boxes, probs.reshape(-1, 1), label.reshape(-1, 1)], dim=1)
+            boxes_probs_classes = torch.cat([boxes_probs_classes,box_probs])
+        if boxes_probs_classes.size(0) > 0: 
+            box_probs = box_utils.nms(boxes_probs_classes, self.nms_method,
                                       score_threshold=prob_threshold,
                                       iou_threshold=self.iou_threshold,
                                       sigma=self.sigma,
                                       top_k=top_k,
                                       candidate_size=self.candidate_size)
-            picked_box_probs.append(box_probs)
-            picked_labels.extend([class_index] * box_probs.size(0))
+            picked_box_probs.append(box_probs[..., :-1])
+            # picked_labels.extend([class_index] * box_probs.size(0))
         if not picked_box_probs:
             return torch.tensor([]), torch.tensor([]), torch.tensor([])
         picked_box_probs = torch.cat(picked_box_probs)
@@ -68,4 +72,4 @@ class Predictor:
         picked_box_probs[:, 1] *= height
         picked_box_probs[:, 2] *= width
         picked_box_probs[:, 3] *= height
-        return picked_box_probs[:, :4], torch.tensor(picked_labels), picked_box_probs[:, 4]
+        return picked_box_probs[:, :4], box_probs[..., -1], picked_box_probs[:, 4]

@@ -97,6 +97,8 @@ def convert_locations_to_boxes(locations, priors, center_variance,
         boxes:  priors: [[center_x, center_y, h, w]]. All the values
             are relative to the image size.
     """
+    if torch.cuda.is_available():
+        locations = locations.cuda()
     # priors can have one dimension less.
     if priors.dim() + 1 == locations.dim():
         priors = priors.unsqueeze(0)
@@ -227,8 +229,8 @@ def hard_nms(box_scores, iou_threshold, top_k=-1, candidate_size=200):
     Returns:
          picked: a list of indexes of the kept boxes
     """
-    scores = box_scores[:, -1]
-    boxes = box_scores[:, :-1]
+    scores = box_scores[:, -2]
+    boxes = box_scores[:, :-2]
     picked = []
     _, indexes = scores.sort(descending=True)
     indexes = indexes[:candidate_size]
