@@ -1,0 +1,22 @@
+name: TSSD
+# conda env create -f requirements.yml
+# then conda activate TSDD
+# to remove, simply do conda env remove -n TSSD
+channels:
+- anaconda # default one
+- pytorch # necessary for pytorch and torchvision
+dependencies:
+- python=3.7
+- matplotlib
+- nb_conda
+- numpy
+- pip # needed to install pip dependencies below
+- pytorch
+- torchvision
+- scipy
+- tensorboard
+- pandas
+- spyder
+- pip:
+  - scikit-learn
+  - opencv-contrib-python
