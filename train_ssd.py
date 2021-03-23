@@ -15,7 +15,7 @@ from vision.ssd.vgg_ssd1 import create_vgg_ssd1
 from vision.ssd.vgg_ssd2 import create_vgg_ssd2
 from vision.ssd.mobilenetv1_ssd import create_mobilenetv1_ssd
 from vision.ssd.mobilenetv1_ssd_lite import create_mobilenetv1_ssd_lite
-from vision.ssd.mobilenet_v2_ssd_lite import create_mobilenetv2_ssd_lite
+from vision.ssd.mobilenet_v2_ssd_lite2 import create_mobilenetv2_ssd_lite
 from vision.ssd.mobilenetv3_ssd_lite import create_mobilenetv3_large_ssd_lite, create_mobilenetv3_small_ssd_lite
 from vision.ssd.squeezenet_ssd_lite import create_squeezenet_ssd_lite
 from vision.datasets.voc_dataset import VOCDataset
@@ -23,8 +23,9 @@ from vision.datasets.open_images import OpenImagesDataset
 from vision.datasets.yolo_dataset import YOLODataset
 from vision.datasets.index_dataset import IndexDataset
 from vision.nn.multibox_loss import MultiboxLoss
-from vision.ssd.config import vgg_ssd_config, vgg_ssd_config1, vgg_ssd_config2
-from vision.ssd.config import mobilenetv1_ssd_config
+from vision.ssd.config import vgg_ssd_config1, vgg_ssd_config2 # vgg_ssd_config, 
+from vision.ssd.config import vgg_ssd_config640 as vgg_ssd_config
+from vision.ssd.config import mobilenetv1_ssd_config2 as mobilenetv1_ssd_config
 from vision.ssd.config import squeezenet_ssd_config
 from vision.ssd.data_preprocessing import TrainAugmentation, TestTransform
 
@@ -102,7 +103,7 @@ parser.add_argument('--checkpoint_folder', default='models/',
                     help='Directory for saving checkpoint models')
 parser.add_argument('--log', default=sys.stdout,
                     help='File to logging')
-parser.add_argument('--visdom', action='store_false',
+parser.add_argument('--visdom', action='store_true',
                     help='Use visdom for loss visualization')
 
 
