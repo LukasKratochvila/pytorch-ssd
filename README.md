@@ -1,3 +1,23 @@
+# Usage
+Conda enviroment
+```conda
+conda env create -f tssd_current.yaml
+```
+To train
+```python
+python train_ssd.py --dataset_type "dataset" --datasets "dataset to path" ...
+```
+To evaluate and create dir with results
+```python
+python eval_ssd.py --config configs/"dataset"/"version"
+```
+To draw image results
+```python
+python draw_eval_results_adam.py
+```
+
+---
+---
 # Single Shot MultiBox Detector Implementation in Pytorch
 
 This repo implements [SSD (Single Shot MultiBox Detector)](https://arxiv.org/abs/1512.02325). The implementation is heavily influenced by the projects [ssd.pytorch](https://github.com/amdegroot/ssd.pytorch) and [Detectron](https://github.com/facebookresearch/Detectron).
