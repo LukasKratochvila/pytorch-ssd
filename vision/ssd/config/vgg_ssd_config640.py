@@ -17,8 +17,8 @@ specs = [
     SSDSpec(40, 16, SSDBoxSizes(30, 60), [2, 3]),
     SSDSpec(20, 32, SSDBoxSizes(60, 105), [2, 3]),
     SSDSpec(10, 64, SSDBoxSizes(105, 150), [2, 3]),
-    SSDSpec(5, 128, SSDBoxSizes(150, 200), [2, 3]),
-    SSDSpec(3, 214, SSDBoxSizes(250, 340), [2, 3])
+    SSDSpec(8, 80, SSDBoxSizes(150, 200), [2, 3]),
+    SSDSpec(6, 107, SSDBoxSizes(250, 340), [2, 3])
 ]
 #specs = [
 #    SSDSpec(38, 16, SSDBoxSizes(15, 30), [1, 2]),
